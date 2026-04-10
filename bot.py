@@ -1,5 +1,5 @@
 import io
-import csv
+import xlsxwriter
 import sqlite3
 import os
 from datetime import datetime
@@ -242,10 +242,12 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [InlineKeyboardButton("📊 Statistika", callback_data="admin_stats")],
+        [InlineKeyboardButton("📝 Imtihon ma'lumoti", callback_data="set_exam_info")],
+        [InlineKeyboardButton("📋 Ro'yxatni ko'rish", callback_data="admin_view_list")],
         [InlineKeyboardButton("⏰ Muddatni belgilash", callback_data="set_deadline")],
         [InlineKeyboardButton("🏟 Sig'imni belgilash", callback_data="set_capacity")],
         [InlineKeyboardButton("📢 Reklama", callback_data="send_ad")],
-        [InlineKeyboardButton("📂 Eksport (CSV)", callback_data="admin_export")],
+        [InlineKeyboardButton("📂 Eksport (Excel)", callback_data="admin_export")],
     ]
     await update.message.reply_text("Admin panel:", reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -270,6 +272,25 @@ async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
         msg = f"📊 Statistika:\n• Ro'yxatdan o'tganlar: {total}\n• Bot a'zolari: {u_total}\n• Sig'im: {cap}\n• Deadline: {deadline}"
         await query.message.reply_text(msg)
 
+    elif data == "set_exam_info":
+        context.user_data["step"] = "admin_set_exam_info"
+        current_info = get_setting('exam_info')
+        await query.message.reply_text(f"Hozirgi ma'lumot:\n\n{current_info}\n\nYangi ma'lumotni yuboring:")
+
+    elif data == "admin_view_list":
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT id, full_name, phone FROM registrations ORDER BY id DESC LIMIT 10")
+        rows = cur.fetchall()
+        conn.close()
+        if not rows:
+            await query.message.reply_text("Hali hech kim ro'yxatdan o'tmagan.")
+        else:
+            msg = "📋 Oxirgi 10 ta ro'yxatdan o'tganlar:\n\n"
+            for row in rows:
+                msg += f"{row['id']}. {row['full_name']} - {row['phone']}\n"
+            await query.message.reply_text(msg)
+
     elif data == "set_deadline":
         context.user_data["step"] = "admin_set_deadline"
         await query.message.reply_text("Yangi deadline kiriting (Format: YYYY-MM-DD HH:MM):\nMasalan: 2026-05-15 18:00")
@@ -289,21 +310,38 @@ async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
         rows = cur.fetchall()
         conn.close()
 
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(["ID", "FIO", "Phone", "Exam", "Username", "Time"])
-        writer.writerows(rows)
+        output = io.BytesIO()
+        workbook = xlsxwriter.Workbook(output)
+        worksheet = workbook.add_worksheet("Registrations")
+        
+        headers = ["ID", "FIO", "Telefon", "Imtihon", "Username", "Vaqti"]
+        for col_num, header in enumerate(headers):
+            worksheet.write(0, col_num, header)
+            
+        for row_num, row in enumerate(rows, 1):
+            worksheet.write(row_num, 0, row['id'])
+            worksheet.write(row_num, 1, row['full_name'])
+            worksheet.write(row_num, 2, row['phone'])
+            worksheet.write(row_num, 3, row['exam_date'])
+            worksheet.write(row_num, 4, row['username'])
+            worksheet.write(row_num, 5, row['created_at'])
+            
+        workbook.close()
         output.seek(0)
 
-        bio = io.BytesIO(output.getvalue().encode("utf-8"))
-        bio.name = "registrations.csv"
+        bio = io.BytesIO(output.getvalue())
+        bio.name = "registrations.xlsx"
         await context.bot.send_document(chat_id=query.from_user.id, document=bio)
 
 async def handle_admin_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     step = context.user_data.get("step")
     text = update.message.text.strip()
     
-    if step == "admin_set_deadline":
+    if step == "admin_set_exam_info":
+        set_setting('exam_info', text)
+        await update.message.reply_text("Imtihon ma'lumoti muvaffaqiyatli yangilandi! ✅")
+
+    elif step == "admin_set_deadline":
         try:
             datetime.strptime(text, "%Y-%m-%d %H:%M")
             set_setting('deadline', text)
@@ -369,7 +407,7 @@ def main():
     app.add_handler(CommandHandler("admin", admin_panel))
     
     app.add_handler(CallbackQueryHandler(check_subscription, pattern="check_subscription"))
-    app.add_handler(CallbackQueryHandler(admin_callback_handler, pattern="^admin_|^set_"))
+    app.add_handler(CallbackQueryHandler(admin_callback_handler, pattern="^(admin_|set_|send_)"))
     
     app.add_handler(MessageHandler(filters.CONTACT, handle_phone_number))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
