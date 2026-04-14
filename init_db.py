@@ -41,6 +41,10 @@ def init_db():
     # Default settings
     default_settings = [
         ('exam_info', "ℹ️ Ona tili Mock imtihoni haqida ma'lumot:\n• Sana: Belgilanmagan\n• Vaqt: 09:00\n• Manzil: BEST SCHOOL\n• Narx: Belgilanmagan"),
+        ('exam_date', 'Belgilanmagan'),
+        ('exam_time', '09:00'),
+        ('exam_location', 'BEST SCHOOL'),
+        ('exam_price', 'Belgilanmagan'),
         ('deadline', '2026-12-31 23:59'),
         ('capacity', '100'),
         ('is_registration_open', '1')

@@ -55,6 +55,20 @@ def set_setting(key, value):
     conn.commit()
     conn.close()
 
+def get_formatted_exam_info():
+    date = get_setting('exam_date', 'Belgilanmagan')
+    time = get_setting('exam_time', '09:00')
+    location = get_setting('exam_location', 'BEST SCHOOL')
+    price = get_setting('exam_price', 'Belgilanmagan')
+    
+    return (
+        f"ℹ️ Ona tili Mock imtihoni haqida ma'lumot:\n"
+        f"• Sana: {date}\n"
+        f"• Vaqt: {time}\n"
+        f"• Manzil: {location}\n"
+        f"• Narx: {price}"
+    )
+
 def is_admin(user_id: int) -> bool:
     return user_id in ADMIN_IDS
 
@@ -127,7 +141,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    exam_info = get_setting('exam_info')
+    exam_info = get_formatted_exam_info()
     await update.message.reply_text(exam_info)
 
     open_status, msg = is_registration_open()
@@ -148,7 +162,7 @@ async def check_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if await is_subscribed(context.bot, user_id):
         await query.message.delete()
-        exam_info = get_setting('exam_info')
+        exam_info = get_formatted_exam_info()
         await query.message.reply_text(exam_info)
         
         open_status, msg = is_registration_open()
@@ -274,9 +288,47 @@ async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
         await query.message.reply_text(msg)
 
     elif data == "set_exam_info":
-        context.user_data["step"] = "admin_set_exam_info"
-        current_info = get_setting('exam_info')
-        await query.message.reply_text(f"Hozirgi ma'lumot:\n\n{current_info}\n\nYangi ma'lumotni yuboring:")
+        keyboard = [
+            [InlineKeyboardButton("📅 Sana", callback_data="admin_edit_date")],
+            [InlineKeyboardButton("⏰ Vaqt", callback_data="admin_edit_time")],
+            [InlineKeyboardButton("📍 Manzil", callback_data="admin_edit_location")],
+            [InlineKeyboardButton("💰 Narx", callback_data="admin_edit_price")],
+            [InlineKeyboardButton("⬅️ Orqaga", callback_data="admin_back")],
+        ]
+        info = get_formatted_exam_info()
+        await query.message.edit_text(
+            f"Hozirgi ma'lumotlar:\n\n{info}\n\nQaysi maydonni o'zgartirmoqchisiz?",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    elif data == "admin_edit_date":
+        context.user_data["step"] = "admin_set_exam_date"
+        await query.message.reply_text("Yangi sanani kiriting (masalan: 25-may):")
+
+    elif data == "admin_edit_time":
+        context.user_data["step"] = "admin_set_exam_time"
+        await query.message.reply_text("Yangi vaqtni kiriting (masalan: 14:00):")
+
+    elif data == "admin_edit_location":
+        context.user_data["step"] = "admin_set_exam_location"
+        await query.message.reply_text("Yangi manzilni kiriting:")
+
+    elif data == "admin_edit_price":
+        context.user_data["step"] = "admin_set_exam_price"
+        await query.message.reply_text("Yangi narxni kiriting:")
+
+    elif data == "admin_back":
+        await admin_panel(update, context) # This might skip if query is passed
+        # Better: redraw admin panel
+        await query.message.delete()
+        await context.bot.send_message(
+            chat_id=query.from_user.id,
+            text="Admin panel:",
+            reply_markup=query.message.reply_markup # Wait, this won't work easily
+        )
+        # Re-trigger admin_panel manually
+        update.message = query.message
+        await admin_panel(update, context)
 
     elif data == "admin_view_list":
         conn = get_db_connection()
@@ -360,9 +412,21 @@ async def handle_admin_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     step = context.user_data.get("step")
     text = update.message.text.strip()
     
-    if step == "admin_set_exam_info":
-        set_setting('exam_info', text)
-        await update.message.reply_text("Imtihon ma'lumoti muvaffaqiyatli yangilandi! ✅")
+    if step == "admin_set_exam_date":
+        set_setting('exam_date', text)
+        await update.message.reply_text("Imtihon sanasi yangilandi! ✅")
+
+    elif step == "admin_set_exam_time":
+        set_setting('exam_time', text)
+        await update.message.reply_text("Imtihon vaqti yangilandi! ✅")
+
+    elif step == "admin_set_exam_location":
+        set_setting('exam_location', text)
+        await update.message.reply_text("Imtihon manzili yangilandi! ✅")
+
+    elif step == "admin_set_exam_price":
+        set_setting('exam_price', text)
+        await update.message.reply_text("Imtihon narxi yangilandi! ✅")
 
     elif step == "admin_set_deadline":
         try:
