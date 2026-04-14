@@ -248,6 +248,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🏟 Sig'imni belgilash", callback_data="set_capacity")],
         [InlineKeyboardButton("📢 Reklama", callback_data="send_ad")],
         [InlineKeyboardButton("📂 Eksport (Excel)", callback_data="admin_export")],
+        [InlineKeyboardButton("🔄 Bazani tozalash", callback_data="admin_reset_confirm")],
     ]
     await update.message.reply_text("Admin panel:", reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -332,6 +333,28 @@ async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
         bio = io.BytesIO(output.getvalue())
         bio.name = "registrations.xlsx"
         await context.bot.send_document(chat_id=query.from_user.id, document=bio)
+
+    elif data == "admin_reset_confirm":
+        keyboard = [
+            [InlineKeyboardButton("✅ Ha, o'chirish", callback_data="admin_reset_execute")],
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="admin_reset_cancel")],
+        ]
+        await query.message.reply_text(
+            "⚠️ DIQQAT! Barcha ro'yxatdan o'tganlar ma'lumotlarini o'chirib tashlamoqchimisiz?\nBu amalni ortga qaytarib bo'lmaydi!",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    elif data == "admin_reset_execute":
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM registrations")
+        cur.execute("DELETE FROM sqlite_sequence WHERE name='registrations'")
+        conn.commit()
+        conn.close()
+        await query.message.edit_text("✅ Ma'lumotlar muvaffaqiyatli o'chirildi! Baza tozalandi.")
+
+    elif data == "admin_reset_cancel":
+        await query.message.edit_text("❌ O'chirish bekor qilindi.")
 
 async def handle_admin_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     step = context.user_data.get("step")
