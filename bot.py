@@ -1,4 +1,6 @@
 import io
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import xlsxwriter
 import sqlite3
 import os
@@ -480,7 +482,29 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif step.startswith("admin_"):
         await handle_admin_input(update, context)
 
+# =========================
+# Health Check Server (Render / Web Service)
+# =========================
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain; charset=utf-8')
+        self.end_headers()
+        self.wfile.write(b"Ona tili Mock boti faol ishlamoqda!")
+
+    def log_message(self, format, *args):
+        pass
+
+def run_health_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    server.serve_forever()
+
 def main():
+    # Render / Server portini ochish (Health check)
+    health_thread = threading.Thread(target=run_health_server, daemon=True)
+    health_thread.start()
+    print("Health-check veb-serveri ishga tushdi...")
     if not BOT_TOKEN:
         print("Xatolik: BOT_TOKEN topilmadi!")
         return

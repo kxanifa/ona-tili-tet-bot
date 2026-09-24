@@ -1,0 +1,13 @@
+﻿services:
+  - type: web
+    name: ona-tili-mock-bot
+    runtime: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.13
+      - key: DATABASE_PATH
+        value: database.db
