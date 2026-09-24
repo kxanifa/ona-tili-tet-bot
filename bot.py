@@ -30,7 +30,8 @@ from telegram.ext import (
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_IDS = [int(id.strip()) for id in os.getenv("ADMIN_IDS", "").split(",") if id.strip()]
+admin_raw = os.getenv("ADMIN_IDS", "").replace(" ", ",").replace(";", ",")
+ADMIN_IDS = [int(x.strip()) for x in admin_raw.split(",") if x.strip().isdigit()]
 CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "@BestITM")
 DATABASE_PATH = os.getenv("DATABASE_PATH", "database.db")
 
